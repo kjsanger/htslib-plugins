@@ -56,9 +56,22 @@ DEALINGS IN THE SOFTWARE.  */
 #define PRIORITY (10 * IRODS_VERSION_MAJOR) + IRODS_VERSION_MINOR
 #else
 #define PRIORITY 30
+#endif
+
+#if IRODS_VERSION_INTEGER >= 4030000
+// In iRODS 4.3.0 and above init_client_api_table() has been replaced by load_client_api_plugins()
+static void irods_init_plugins() {
+    load_client_api_plugins();
+}
+#elif IRODS_VERSION_INTEGER >= 4000000
+// In iRODS 4.0.x to 4.2.x init_client_api_table() is used
+static void irods_init_plugins() {
+    init_client_api_table();
+}
+#else
 // For iRODS 3.x, there is no init_client_api_table() to call and clientLogin()
 // has fewer parameters.  Define wrappers so the 4.x-style code below compiles.
-static void init_client_api_table() { }
+static void irods_init_plugins() { }
 #define clientLogin(conn, x, y) (clientLogin((conn)))
 #endif
 
@@ -135,7 +148,11 @@ static int irods_init()
     // state (by default, termination; or as already set by our caller).
     pipehandler_ret = sigaction(SIGPIPE, NULL, &pipehandler);
 
-    init_client_api_table();
+    irods_init_plugins();
+    if (hts_verbose >= 5) {
+        fputs("[M::hfile_irods.init] plugins loaded\n", stderr);
+    }
+
     irods.conn = rcConnect(irods.env.rodsHost, irods.env.rodsPort,
                            irods.env.rodsUserName, irods.env.rodsZone,
                            NO_RECONN, &err);
